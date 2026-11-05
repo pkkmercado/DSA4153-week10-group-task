@@ -47,9 +47,16 @@ class TestRecordValidationAndDeduplication(unittest.TestCase):
 
     # Category 6: unparseable number
     def test_unparseable_number(self):
-        res = self.validator.validate_record(make_rec(lifeExp="INVALID_FLOAT"))
+        res = self.validator.validate_record(make_rec(lifeExp="12abc"))
         self.assertFalse(res.is_valid)
         self.assertIn("Unparseable numeric value", res.reason)
+
+    def test_underscore_in_number_is_rejected(self):
+        # float("1_000") would succeed in Python, so it needs its own rule.
+        res = self.validator.validate_record(make_rec(pop="1_000"))
+        self.assertFalse(res.is_valid)
+        self.assertIn("Unparseable numeric value", res.reason)
+        self.assertIn("1_000", res.reason)
 
     # Category 7: fractional year / population
     def test_fractional_year_and_population(self):
@@ -147,4 +154,16 @@ class TestRecordValidationAndDeduplication(unittest.TestCase):
     # Category 10: conflicting keys
     def test_conflicting_keys(self):
         records = [make_clean(), make_clean(lifeExp=70.0, source_record=2)]
-        with
+        with self.assertRaises(ConflictingKeyError):
+            find_conflicts(records)
+        with self.assertRaises(ConflictingKeyError):
+            deduplicate_and_check_conflicts(records)
+
+    def test_near_equal_floats_are_a_conflict_not_a_duplicate(self):
+        records = [make_clean(), make_clean(lifeExp=65.000000001, source_record=2)]
+        with self.assertRaises(ConflictingKeyError):
+            deduplicate_and_check_conflicts(records)
+
+
+if __name__ == "__main__":
+    unittest.main()
