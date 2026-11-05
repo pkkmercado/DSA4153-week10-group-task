@@ -23,11 +23,11 @@ class ValidationResult:
 class ValidationRun:
     """Holds the validation rules and applies them to records."""
 
-    def __init__(self, allowed_continents: Set[str], allowed_year_min: int,
-                 allowed_year_max: int) -> None:
+    def __init__(self, allowed_continents: Set[str], allowed_years: Set[int],
+                 max_life_exp: float = 120.0) -> None:
         self.allowed_continents = set(allowed_continents)
-        self.allowed_year_min = allowed_year_min
-        self.allowed_year_max = allowed_year_max
+        self.allowed_years = set(allowed_years)
+        self.max_life_exp = max_life_exp
 
     @staticmethod
     def _parse_number(raw: str, name: str) -> Tuple[Optional[float], Optional[str]]:
@@ -63,12 +63,8 @@ class ValidationRun:
         if not year_f.is_integer():
             return ValidationResult(False, reason=f"Fractional year: '{raw_year}'")
         year = int(year_f)
-        if not (self.allowed_year_min <= year <= self.allowed_year_max):
-            return ValidationResult(
-                False,
-                reason=f"Year {year} out of allowed range "
-                       f"[{self.allowed_year_min}, {self.allowed_year_max}]"
-            )
+        if year not in self.allowed_years:
+            return ValidationResult(False, reason=f"Year {year} not in allowed years")
 
         raw_pop = str(record.get("pop", "") or "").strip()
         pop_f, reason = self._parse_number(raw_pop, "pop")
@@ -86,9 +82,9 @@ class ValidationRun:
             val, reason = self._parse_number(raw_val, field)
             if reason:
                 return ValidationResult(False, reason=reason)
-            if val <= 0:
+            if val <= 0 or (field == "lifeExp" and val > self.max_life_exp):
                 return ValidationResult(
-                    False, reason=f"Out-of-range value for {field}: '{raw_val}'"
+                    False, reason=f"Out-of-range {field}: '{raw_val}'"
                 )
             floats[field] = val
 
