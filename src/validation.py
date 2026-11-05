@@ -4,6 +4,9 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+CANONICAL_FIELDS = ("country", "continent", "year", "lifeExp", "pop", "gdpPercap")
+_VALUE_FIELDS = ("continent", "lifeExp", "pop", "gdpPercap")
+
 
 class ConflictingKeyError(ValueError):
     """Raised when two valid records share (country, year) but differ in another field."""
@@ -31,6 +34,8 @@ class ValidationRun:
         """Parse text to a finite float; return (value, None) or (None, reason)."""
         if raw == "":
             return None, f"Missing {name}"
+        if "_" in raw:
+            return None, f"Unparseable numeric value for {name}: '{raw}'"
         try:
             value = float(raw)
         except ValueError:
@@ -40,6 +45,8 @@ class ValidationRun:
         return value, None
 
     def validate_record(self, record: Dict[str, Any]) -> ValidationResult:
+        """Validate one record as text before any integer conversion.
+        """
         country = str(record.get("country", "") or "").strip()
         continent = str(record.get("continent", "") or "").strip()
         if not country:
@@ -60,7 +67,8 @@ class ValidationRun:
             return ValidationResult(
                 False,
                 reason=f"Year {year} out of allowed range "
-                       f"[{self.allowed_year_min}, {self.allowed_year_max}]")
+                       f"[{self.allowed_year_min}, {self.allowed_year_max}]"
+            )
 
         raw_pop = str(record.get("pop", "") or "").strip()
         pop_f, reason = self._parse_number(raw_pop, "pop")
@@ -80,7 +88,8 @@ class ValidationRun:
                 return ValidationResult(False, reason=reason)
             if val <= 0:
                 return ValidationResult(
-                    False, reason=f"Out-of-range value for {field}: '{raw_val}'")
+                    False, reason=f"Out-of-range value for {field}: '{raw_val}'"
+                )
             floats[field] = val
 
         clean_rec = {
@@ -100,30 +109,25 @@ def process_validations_and_quarantine(
     raw_records: List[Dict[str, Any]],
     validator: ValidationRun,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Split records into (valid list, quarantine list)."""
+    """Split flat records into (valid list, quarantine list)."""
     valid_records: List[Dict[str, Any]] = []
     quarantine_records: List[Dict[str, Any]] = []
 
     for rec in raw_records:
         res = validator.validate_record(rec)
-        if res.is_valid:
+        if res.is_valid and res.clean_record is not None:
             valid_records.append(res.clean_record)
         else:
-            quarantine_records.append({
+            row = {
                 "source_file": rec.get("source_file", ""),
                 "source_record": rec.get("source_record", ""),
                 "reason": res.reason,
-                "country": rec.get("country", ""),
-                "continent": rec.get("continent", ""),
-                "year": rec.get("year", ""),
-                "lifeExp": rec.get("lifeExp", ""),
-                "pop": rec.get("pop", ""),
-                "gdpPercap": rec.get("gdpPercap", ""),
-            })
+            }
+            for field in CANONICAL_FIELDS:
+                row[field] = rec.get(field, "")
+            quarantine_records.append(row)
     return valid_records, quarantine_records
 
-
-_VALUE_FIELDS = ("continent", "lifeExp", "pop", "gdpPercap")
 
 def process_reader_records(
     records: List[Dict[str, Any]],
@@ -139,19 +143,65 @@ def process_reader_records(
         flat["source_file"] = source_file
         flat["source_record"] = rec["source_record"]
         res = validator.validate_record(flat)
-        if res.is_valid:
+        if res.is_valid and res.clean_record is not None:
             valid_records.append(res.clean_record)
         else:
-            row = {"source_file": source_file,
-                   "source_record": rec["source_record"],
-                   "reason": res.reason}
-            for field in ("country", "continent", "year", "lifeExp", "pop", "gdpPercap"):
+            row = {
+                "source_file": source_file,
+                "source_record": rec["source_record"],
+                "reason": res.reason,
+            }
+            for field in CANONICAL_FIELDS:
                 row[field] = rec["values"].get(field, "")
             quarantine_records.append(row)
     return valid_records, quarantine_records
+
+
+def _same_values(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    """Return True if two clean records have identical non-key fields."""
+    return all(a[f] == b[f] for f in _VALUE_FIELDS)
 
 
 def find_conflicts(valid_records: List[Dict[str, Any]]) -> None:
     """Raise ConflictingKeyError if a (country, year) key has differing values."""
     seen: Dict[Tuple[str, int], Dict[str, Any]] = {}
     for rec in valid_records:
+        key = (rec["country"], rec["year"])
+        if key not in seen:
+            seen[key] = rec
+        elif not _same_values(rec, seen[key]):
+            raise ConflictingKeyError(
+                f"Conflicting key found for key {key} in file "
+                f"'{rec.get('source_file')}' at record {rec.get('source_record')}."
+            )
+
+
+def deduplicate_and_check_conflicts(
+    valid_records: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Remove exact duplicate valid records; raise ConflictingKeyError on conflict.
+
+    Returns (deduplicated records, duplicate log). Every removed copy is logged.
+    """
+    seen: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    deduped_records: List[Dict[str, Any]] = []
+    duplicate_log: List[Dict[str, Any]] = []
+
+    for rec in valid_records:
+        key = (rec["country"], rec["year"])
+        if key not in seen:
+            seen[key] = rec
+            deduped_records.append(rec)
+        elif _same_values(rec, seen[key]):
+            duplicate_log.append({
+                "source_file": rec.get("source_file"),
+                "source_record": rec.get("source_record"),
+                "country": rec["country"],
+                "year": rec["year"],
+            })
+        else:
+            raise ConflictingKeyError(
+                f"Conflicting key found for key {key} in file "
+                f"'{rec.get('source_file')}' at record {rec.get('source_record')}."
+            )
+    return deduped_records, duplicate_log
