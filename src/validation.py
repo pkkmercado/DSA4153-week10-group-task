@@ -125,6 +125,31 @@ def process_validations_and_quarantine(
 
 _VALUE_FIELDS = ("continent", "lifeExp", "pop", "gdpPercap")
 
+def process_reader_records(
+    records: List[Dict[str, Any]],
+    validator: ValidationRun,
+    source_file: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Validate reader output (clean/values shape); quarantine keeps original text."""
+    valid_records: List[Dict[str, Any]] = []
+    quarantine_records: List[Dict[str, Any]] = []
+
+    for rec in records:
+        flat = dict(rec["clean"])
+        flat["source_file"] = source_file
+        flat["source_record"] = rec["source_record"]
+        res = validator.validate_record(flat)
+        if res.is_valid:
+            valid_records.append(res.clean_record)
+        else:
+            row = {"source_file": source_file,
+                   "source_record": rec["source_record"],
+                   "reason": res.reason}
+            for field in ("country", "continent", "year", "lifeExp", "pop", "gdpPercap"):
+                row[field] = rec["values"].get(field, "")
+            quarantine_records.append(row)
+    return valid_records, quarantine_records
+
 
 def find_conflicts(valid_records: List[Dict[str, Any]]) -> None:
     """Raise ConflictingKeyError if a (country, year) key has differing values."""
