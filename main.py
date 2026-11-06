@@ -58,7 +58,7 @@ def run_pipeline(data_dir="data", output_dir="outputs", manifest_path=None):
             elif fmt == "xlsx":
                 settings = {"sheet": spec.get("sheet_name", "observations")}
             elif fmt == "json":
-                settings = {"records_path": spec.get("record_path", "records"),
+                settings = {"record_path": spec.get("record_path", "records"),
                             "encoding": spec.get("encoding", "utf-8")}
 
             path = data_dir / spec["file"]
