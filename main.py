@@ -133,17 +133,51 @@ def run_pipeline(data_dir="data", output_dir="outputs", manifest_path=None):
         raise
 
 
+
 def main():
     parser = argparse.ArgumentParser(description="Four-format data recovery and validation")
-    parser.add_argument("--data", default="data", help="Input data directory")
-    parser.add_argument("--output", default="outputs", help="Final output directory")
+    parser.add_argument("--config", default=None, help="Configuration JSON path")
+    parser.add_argument("--data", default=None, help="Input data directory")
+    parser.add_argument("--output", default=None, help="Final output directory")
     parser.add_argument("--manifest", default=None, help="Manifest JSON path")
     args = parser.parse_args()
+
+    settings = {
+        "data_dir": "data",
+        "output_dir": "outputs",
+        "manifest_path": None
+    }
+
     try:
-        run_pipeline(args.data, args.output, args.manifest)
-    except Exception:
+        if args.config:
+            with Path(args.config).open(encoding="utf-8") as handle:
+                config = json.load(handle)
+
+            if not isinstance(config, dict):
+                raise ValueError("Configuration must be a JSON object")
+
+            settings["data_dir"] = config.get("data_dir", "data")
+            settings["output_dir"] = config.get("output_dir", "outputs")
+            settings["manifest_path"] = config.get("manifest_path")
+
+        if args.data is not None:
+            settings["data_dir"] = args.data
+        if args.output is not None:
+            settings["output_dir"] = args.output
+        if args.manifest is not None:
+            settings["manifest_path"] = args.manifest
+
+        run_pipeline(
+            settings["data_dir"],
+            settings["output_dir"],
+            settings["manifest_path"]
+        )
+    except Exception as error:
+        print(f"FAILED: {error}", file=sys.stderr)
         return 1
+
     return 0
+
 
 
 if __name__ == "__main__":
