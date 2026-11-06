@@ -1,0 +1,26 @@
+﻿Submission Manifest
+Repository URL: https://github.com/pkkmercado/DSA4153-week10-group-task 
+Release tag: week10-v1.0
+Full release commit hash: b0cd5daba8ed9050976d0ff5fc1dbb000a706558
+Canonical records: 1704
+Input Files and SHA-256 Checksums:
+Input file
+	SHA-256
+	data/country_records.csv
+	11567e9c8c3fbeda6115cdf0797b6d234a246e60b0d2156548088ecd30542ca8
+	data/country_records.xlsx
+	0756178ebfb07ae7adcedd07f1237bee7ef3bb95714102ca39657cde6784065e
+	data/country_records.json
+	400966a74d2d19235e7d7f3091da71040d272e0d8ad0ca1213e45d0aa06306c3
+	data/country_records.parquet
+	7f72d4ddb71d7cc34c50782220aca4b3bd68d9f0fe87fb0022b677a30b3c449a
+	data/manifest.json
+	4167a09f92404b7dabe00cedefc625aba0ebda6a9f46afcdcc3aac1b47bb5ade
+	data/README.txt
+	7755895aa4e2bac3d46dde1749a1635e52cbfa33164e65166dc680a70d8f00a4
+	data/missing_column.csv
+	0d1c103d3e1c3bab4d27f7867e4d262a3dea9aa77e280bc0bc8a48aef43c4133
+	data/conflicting_key.csv
+	770bf1a468f08955676ed49d8a31525458218dc142cf537b8728ad6db2c0edcb
+	data/unsupported.txt
+	e640f158c2d87f493570eeef61145f4f9aa02b740553afb1160a93a834c59d55
