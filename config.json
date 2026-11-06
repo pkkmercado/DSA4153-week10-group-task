@@ -1,0 +1,6 @@
+{
+  "data_dir": "data",
+  "output_dir": "outputs",
+  "manifest_path": "data/manifest.json",
+  "reporting_year": 2007
+}
