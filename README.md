@@ -18,8 +18,8 @@ After successful validation, the program creates a canonical dataset and generat
 | Princess Kassy Mercado | Task 1 – CSV and Excel Readers |
 | Arianne Sumalinog | Task 2 – JSON and Parquet Readers and Normalization |
 | Rianne Rose Mendoza | Task 3 – Data Validation |
-| Keanna Polvoriza | Task 4 – Data Analysis |
-| Olivia Baña | Task 5 – Exports, Comparison, and Pipeline Integration |
+| Keanna Lois Polvoriza | Task 4 – Data Analysis |
+| Olivia Patricia Jovita Baña | Task 5 – Exports, Comparison, and Pipeline Integration |
 
 ## Program Features
 
