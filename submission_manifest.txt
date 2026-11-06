@@ -1,7 +1,7 @@
-﻿Submission Manifest
+Submission Manifest
 Repository URL: https://github.com/pkkmercado/DSA4153-week10-group-task 
 Release tag: week10-v1.0
-Full release commit hash: b0cd5daba8ed9050976d0ff5fc1dbb000a706558
+Full release commit hash: da97a86d82ffd29158d68279771a68d8b4f0a5d9
 Canonical records: 1704
 Input Files and SHA-256 Checksums:
 Input file
