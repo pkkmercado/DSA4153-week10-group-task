@@ -1,3 +1,4 @@
+"""Column mapping and text normalization shared by all four formats."""
 from __future__ import annotations
 
 from typing import Any
@@ -9,16 +10,6 @@ CANONICAL_COLUMNS: list[str] = ["country", "continent", "year", "lifeExp", "pop"
 MappedRecord = dict[str, Any]
 
 
-def orient_column_map(column_map: dict[str, str]) -> dict[str, str]:
-    """Return the map as {original_name: canonical_name}, inverting it if it was given the other way."""
-    canonical = set(CANONICAL_COLUMNS)
-    to_canonical = sum(v in canonical for v in column_map.values())
-    from_canonical = sum(k in canonical for k in column_map)
-    if from_canonical > to_canonical:
-        return {original: name for name, original in column_map.items()}
-    return dict(column_map)
-
-
 def map_columns(
     header: list[str],
     records: list[dict[str, Any]],
@@ -27,23 +18,32 @@ def map_columns(
 ) -> list[MappedRecord]:
     """Rename raw columns to the canonical six and return records keyed by canonical names.
 
-    Columns not in column_map keep their own name (so unrenamed columns still match).
-    Extra columns (e.g. metadata) are dropped. A missing required column, or two
-    columns mapping to the same name, is a file-level error (InputFileError).
-    Original text values are kept untouched under "values".
+    column_map is the manifest's source_to_canonical: {source_name: canonical_name}.
+    Every target must be a canonical name, so a reversed map is a file-level error.
+    Columns not in column_map keep their own name (so source columns that already have
+    a canonical name still match). Extra columns (e.g. metadata) are dropped. A missing
+    required column, or two columns mapping to the same name, is a file-level error
+    (InputFileError). Original text values are kept untouched under "values".
     """
-    rename = orient_column_map(column_map)
-    effective = {col: rename.get(col, col) for col in header}
+    canonical = set(CANONICAL_COLUMNS)
+    unknown_targets = set(column_map.values()) - canonical
+    if unknown_targets:
+        raise InputFileError(
+            f"{source_name}: column map must be source name -> canonical name; "
+            f"unknown canonical name(s): {sorted(unknown_targets)}"
+        )
+
+    effective = {col: column_map.get(col, col) for col in header}
     targets = list(effective.values())
 
-    clashes = {t for t in targets if targets.count(t) > 1 and t in set(CANONICAL_COLUMNS)}
+    clashes = {t for t in targets if targets.count(t) > 1 and t in canonical}
     if clashes:
         raise InputFileError(f"{source_name}: several columns map to {sorted(clashes)}")
-    missing = set(CANONICAL_COLUMNS) - set(targets)
+    missing = canonical - set(targets)
     if missing:
         raise InputFileError(f"{source_name}: missing required column(s): {sorted(missing)}")
 
-    original_for = {canon: orig for orig, canon in effective.items() if canon in set(CANONICAL_COLUMNS)}
+    original_for = {canon: orig for orig, canon in effective.items() if canon in canonical}
     mapped: list[MappedRecord] = []
     for rec in records:
         mapped.append(

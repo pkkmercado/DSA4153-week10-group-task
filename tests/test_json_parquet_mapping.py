@@ -1,3 +1,4 @@
+"""Checks for JSON/Parquet readers, column mapping, missing column and missing key."""
 import json
 import tempfile
 import unittest
@@ -8,9 +9,9 @@ import pyarrow.parquet as pq
 
 from src.errors import InputFileError
 from src.json_parquet_readers import read_json_records, read_parquet_records
-from src.normalize import CANONICAL_COLUMNS, map_columns, normalize_records, orient_column_map
+from src.normalize import CANONICAL_COLUMNS, map_columns, normalize_records
 
-JSON_SETTINGS = {"records_path": "records"}
+JSON_SETTINGS = {"record_path": "records"}
 NESTED_MAP = {
     "place.land": "country", "place.kontinent": "continent", "jahr": "year",
     "measures.lebenserwartung": "lifeExp", "measures.einwohner": "pop",
@@ -61,15 +62,22 @@ class JsonParquetTests(unittest.TestCase):
         self.assertEqual(recs[0]["values"]["jahr"], "1952")           # text, not int
         self.assertEqual(recs[0]["source_file"], "a.json")
 
-    def test_json_dotted_records_path(self):
+    def test_json_dotted_record_path(self):
         p = self.make_json({"data": {"records": [nested("Peru", "Americas", 1952, 1.0, 2, 3.0)]}})
-        _, recs = read_json_records(p, {"records_path": "data.records"})
+        _, recs = read_json_records(p, {"record_path": "data.records"})
         self.assertEqual(len(recs), 1)
 
     def test_json_missing_key_records_is_file_error(self):
         p = self.make_json({"meta": {}, "rows": []})
         with self.assertRaises(InputFileError):
             read_json_records(p, JSON_SETTINGS)
+
+    def test_json_missing_record_path_setting_is_file_error(self):
+        p = self.make_json({"records": [nested("Peru", "Americas", 1952, 1.0, 2, 3.0)]})
+        with self.assertRaises(InputFileError):
+            read_json_records(p, {})                                # clear error, not KeyError
+        with self.assertRaises(InputFileError):
+            read_json_records(p, {"records_path": "records"})       # old name no longer accepted
 
     def test_json_record_missing_key_becomes_empty_text(self):
         bad = nested("Peru", "Americas", 1952, 1.0, 2, 3.0)
@@ -153,9 +161,21 @@ class JsonParquetTests(unittest.TestCase):
         with self.assertRaises(InputFileError):
             map_columns(header, [], cmap, "x")
 
-    def test_reverse_direction_map_is_oriented(self):
-        reversed_map = {v: k for k, v in FLAT_MAP.items()}
-        self.assertEqual(orient_column_map(reversed_map), FLAT_MAP)
+    def test_reversed_column_map_is_file_error(self):
+        reversed_map = {v: k for k, v in FLAT_MAP.items()}   # canonical -> source (wrong way)
+        with self.assertRaises(InputFileError):
+            map_columns(list(FLAT_MAP), [], reversed_map, "x")
+
+    def test_source_names_that_are_already_canonical_keep_working(self):
+        header = ["country", "continent", "jahr", "lebenserwartung", "einwohner", "bip"]
+        cmap = {"country": "country", "jahr": "year", "lebenserwartung": "lifeExp",
+                "einwohner": "pop", "bip": "gdpPercap"}   # "continent" not listed: keeps its name
+        raw = [{"source_file": "f", "source_record": 1,
+                "values": dict(zip(header, ["Peru", "Americas", "1952", "43.9", "8025700", "3758.5"]))}]
+        mapped = map_columns(header, raw, cmap, "f")
+        self.assertEqual(mapped[0]["values"]["country"], "Peru")
+        self.assertEqual(mapped[0]["values"]["continent"], "Americas")
+        self.assertEqual(mapped[0]["values"]["year"], "1952")
 
 
 if __name__ == "__main__":

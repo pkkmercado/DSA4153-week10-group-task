@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import json
@@ -36,27 +37,31 @@ def flatten_record(obj: dict[str, Any], prefix: str = "", sep: str = ".") -> dic
     return flat
 
 
-def find_records(document: Any, records_path: str | list[str], file_name: str) -> list[Any]:
+def find_records(document: Any, record_path: str | list[str], file_name: str) -> list[Any]:
     """Walk a dotted path (e.g. 'data.records') to the record list; missing key is a file error."""
-    keys = records_path.split(".") if isinstance(records_path, str) else list(records_path)
+    keys = record_path.split(".") if isinstance(record_path, str) else list(record_path)
     node = document
     for key in keys:
         if not isinstance(node, dict) or key not in node:
-            raise InputFileError(f"{file_name}: missing key '{key}' in path '{records_path}'")
+            raise InputFileError(f"{file_name}: missing key '{key}' in path '{record_path}'")
         node = node[key]
     if not isinstance(node, list):
-        raise InputFileError(f"{file_name}: '{records_path}' is not a list of records")
+        raise InputFileError(f"{file_name}: '{record_path}' is not a list of records")
     return node
 
 
 def read_json_records(path: str | Path, settings: dict[str, Any]) -> tuple[list[str], list[RawRecord]]:
     """Read a JSON file with an outer metadata object; return (columns, raw records).
 
-    settings keys: records_path (required, e.g. 'records'), encoding (default 'utf-8-sig').
+    settings keys: record_path (required; same name as in manifest.json, e.g. 'records'),
+    encoding (default 'utf-8-sig'). A missing record_path is a file-level error.
     Nested record objects are flattened into dotted column names. The header is the
     ordered union of all keys; a record lacking a key gets "" so it can be quarantined.
     """
     p = check_input_file(path, {".json"})
+    record_path = settings.get("record_path")
+    if not record_path:
+        raise InputFileError(f"{p.name}: setting 'record_path' is required for JSON files")
     encoding = settings.get("encoding", "utf-8-sig")
     try:
         with p.open("r", encoding=encoding) as handle:
@@ -66,7 +71,7 @@ def read_json_records(path: str | Path, settings: dict[str, Any]) -> tuple[list[
     except json.JSONDecodeError as exc:
         raise InputFileError(f"{p.name}: invalid JSON ({exc.msg})") from exc
 
-    items = find_records(document, settings["records_path"], p.name)
+    items = find_records(document, record_path, p.name)
     flat_items: list[dict[str, Any]] = []
     for position, item in enumerate(items, start=1):
         if not isinstance(item, dict):
