@@ -1,8 +1,3 @@
-"""pandas analysis and calculation checks (Member 4).
-
-Input is the canonical table (columns country, continent, year, lifeExp,
-pop, gdpPercap). Nothing here reads files or knows about input formats.
-"""
 from __future__ import annotations
 
 from pathlib import Path
